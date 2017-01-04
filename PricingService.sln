@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.25123.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{CC5FD16D-436D-48AD-A40C-5A424C6E3E79}") = "PricingService", "PricingService.ccproj", "{80D27C59-44C8-4AAE-B031-9FBB16B4D6C7}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WCFServiceWebRole1", "WCFServiceWebRole1\WCFServiceWebRole1.csproj", "{CE8F988F-37D6-408E-B9E4-BCE80EC85527}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{80D27C59-44C8-4AAE-B031-9FBB16B4D6C7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{80D27C59-44C8-4AAE-B031-9FBB16B4D6C7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{80D27C59-44C8-4AAE-B031-9FBB16B4D6C7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{80D27C59-44C8-4AAE-B031-9FBB16B4D6C7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CE8F988F-37D6-408E-B9E4-BCE80EC85527}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CE8F988F-37D6-408E-B9E4-BCE80EC85527}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CE8F988F-37D6-408E-B9E4-BCE80EC85527}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CE8F988F-37D6-408E-B9E4-BCE80EC85527}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
