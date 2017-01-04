@@ -47,7 +47,6 @@ namespace WCFServiceWebRole1
                 string date = pricingCond.calcDate;
                 List<Products> productList = pricingCond.products;
 
-
                 int keyid = Convert.ToInt32(ConfigurationManager.AppSettings["keyid"]);
                 if (modelController == null)
                 {
@@ -66,32 +65,28 @@ namespace WCFServiceWebRole1
                         modelController.LoadConfiguration(model);
                     }
 
-                    modelController.LoadCustomerCache(model,
-                         keyid,
+                    modelController.LoadCustomerCache(model, keyid,
                          DateTime.Today, Convert.ToDateTime("9999-01-01"));
 
                     modelController.LoadCustomer(model, "*", "*", customerCode,
-                     DateTime.Today, Convert.ToDateTime("9999-01-01"));
+                         DateTime.Today, Convert.ToDateTime("9999-01-01"));
 
                     // Get Customer (Cache contains single customer)
-                    customerCache = model.CustomerCache[384852];
+                    customerCache = model.CustomerCache[keyid];
                 }
 
-                modelController.LoadProductPricingIndex(model,
-                 keyid,
-                 23695,
-                DateTime.Today, Convert.ToDateTime("9999-01-01"));
+                modelController.LoadProductPricingIndex(model, keyid, customerCode,
+                    DateTime.Today, Convert.ToDateTime("9999-01-01"));
 
                 // Get Process
                 PricingProcess process = model.Configuration.PricingProcesses[2];
 
-
+                //
                 PricingDoc pricingDoc = new PricingDoc();
-                pricingDoc.Customer = customerCache.Customers[23695];
+                pricingDoc.Customer = customerCache.CustomersByRef[customerCode];
                 pricingDoc.PricingDate = Convert.ToDateTime(date);
-
-                //json = @"ProductId":"0010651731","Quantity":1.04167,"UnitOfMeasure":"CS"},{"ProductId":"0010681531","Quantity":2.16667,"UnitOfMeasure":"CS"}";
-
+                
+                //
                 int i = 10;
                 foreach (Products pdu in productList)
                 {
