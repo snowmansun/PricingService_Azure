@@ -21,6 +21,16 @@ namespace WCFServiceWebRole1
         [OperationContract]
         [WebInvoke(Method = "POST", RequestFormat = WebMessageFormat.Json, ResponseFormat = WebMessageFormat.Json)]
         string CalcPricing(PricingCond pricingCond);
+
+
+        [OperationContract]
+        [WebInvoke(Method = "POST", RequestFormat = WebMessageFormat.Json, ResponseFormat = WebMessageFormat.Json)]
+        string GetComboList(PricingCond pricingCond);
+
+        [OperationContract]
+        [WebInvoke(Method = "POST", RequestFormat = WebMessageFormat.Json, ResponseFormat = WebMessageFormat.Json)]
+        string GetComboDetail(PricingCond pricingCond);
+
     }
 
     // 使用下面示例中说明的数据约定将复合类型添加到服务操作。

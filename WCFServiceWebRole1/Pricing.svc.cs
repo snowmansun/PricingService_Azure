@@ -3,12 +3,14 @@ using PricingApiData;
 using System;
 using System.Collections.Generic;
 using System.Configuration;
+using System.Data;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.ServiceModel;
 using System.ServiceModel.Activation;
 using System.ServiceModel.Web;
 using System.Text;
+using System.Web.Script.Serialization;
 
 namespace WCFServiceWebRole1
 {
@@ -29,10 +31,13 @@ namespace WCFServiceWebRole1
             return composite;
         }
 
+        #region 变量定义
         public static Model model = null;
         public static ModelController modelController = null;
         public static CustomerCache customerCache = null;
+        #endregion
 
+        #region 接口方法
         /// <summary>
         /// 
         /// </summary>
@@ -68,12 +73,12 @@ namespace WCFServiceWebRole1
                     modelController.LoadCustomerCache(model, keyid,
                          DateTime.Today, Convert.ToDateTime("9999-01-01"));
 
-                    modelController.LoadCustomer(model, "*", "*", customerCode,
-                         DateTime.Today, Convert.ToDateTime("9999-01-01"));
-
                     // Get Customer (Cache contains single customer)
                     customerCache = model.CustomerCache[keyid];
                 }
+
+                modelController.LoadCustomer(model, "*", "*", customerCode,
+                       DateTime.Today, Convert.ToDateTime("9999-01-01"));
 
                 modelController.LoadProductPricingIndex(model, keyid, customerCode,
                     DateTime.Today, Convert.ToDateTime("9999-01-01"));
@@ -125,7 +130,7 @@ namespace WCFServiceWebRole1
                     putJson(ref jsonDetail, "Uom", pi.Uom.Uom);
                     putJson(ref jsonDetail, "Quantity", pi.Quantity.ToString());
                     putJson(ref jsonDetail, "TotalQuantity", pi.TotalQuantity.ToString());
-
+                     
                     if (pi.ItemType == PricingItem.ITEM_TYPE_FREE_GOOD)
                     {
                         putJson(ref jsonDetail, "IsFreeGoods", "true");
@@ -174,6 +179,52 @@ namespace WCFServiceWebRole1
             return jsonResult;
         }
 
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="customerCode"></param>
+        /// <returns></returns>
+        public string GetComboList(PricingCond pricingCond)
+        {
+            if (modelController == null)
+            {
+                modelController = new ModelController(
+                   ConfigurationManager.AppSettings["provider"],
+                   ConfigurationManager.AppSettings["connstring"],
+                   "yyyy-MM-dd");
+            }
+
+            string comboListJson = string.Empty;
+            DataTable dtA = modelController.GetComboList(pricingCond.customerCode);
+            comboListJson = Dtb2Json(dtA);
+            return comboListJson;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="pricingCond"></param>
+        /// <returns></returns>
+        public string GetComboDetail(PricingCond pricingCond)
+        {
+            if (modelController == null)
+            {
+                modelController = new ModelController(
+                   ConfigurationManager.AppSettings["provider"],
+                   ConfigurationManager.AppSettings["connstring"],
+                   "yyyy-MM-dd");
+            }
+
+            string comboDetailJson = string.Empty;
+            DataTable dtA = modelController.GetComboListDetail(pricingCond.recordRef);
+            comboDetailJson = Dtb2Json(dtA);
+            return comboDetailJson;
+        }
+
+        #endregion
+
+        #region 自定义方法
         /// <summary>
         /// 
         /// </summary>
@@ -185,9 +236,33 @@ namespace WCFServiceWebRole1
             JsonScr += "\"" + key + "\":\"" + value + "\",";
         }
 
+        /// <summary>
+        /// 将datatable转换为json  
+        /// </summary>
+        /// <param name="dtb">Dt</param>
+        /// <returns>JSON字符串</returns>
+        public static string Dtb2Json(DataTable dtb)
+        {
+            JavaScriptSerializer jss = new JavaScriptSerializer();
+            System.Collections.ArrayList dic = new System.Collections.ArrayList();
+            foreach (DataRow dr in dtb.Rows)
+            {
+                System.Collections.Generic.Dictionary<string, object> drow = new System.Collections.Generic.Dictionary<string, object>();
+                foreach (DataColumn dc in dtb.Columns)
+                {
+                    drow.Add(dc.ColumnName, dr[dc.ColumnName]);
+                }
+                dic.Add(drow);
+
+            }
+            //序列化  
+            return jss.Serialize(dic);
+        }
+
         public string GetData()
         {
             throw new NotImplementedException();
         }
+        #endregion
     }
 }

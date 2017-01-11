@@ -16,6 +16,9 @@ namespace WCFServiceWebRole1
         public string calcDate { get; set; }
 
         [DataMember]
+        public string recordRef { get; set; }
+
+        [DataMember]
         public List<Products> products { get; set; }
     }
 }
