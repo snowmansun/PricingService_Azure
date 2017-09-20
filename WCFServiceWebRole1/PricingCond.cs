@@ -18,6 +18,13 @@ namespace WCFServiceWebRole1
         [DataMember]
         public string recordRef { get; set; }
 
+
+        [DataMember]
+        public string deliverDay { get; set; }
+
+        [DataMember]
+        public string productCode { get; set; }
+
         [DataMember]
         public List<Products> products { get; set; }
     }

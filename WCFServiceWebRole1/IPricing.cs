@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Runtime.Serialization;
 using System.ServiceModel;
@@ -30,6 +31,22 @@ namespace WCFServiceWebRole1
         [OperationContract]
         [WebInvoke(Method = "POST", RequestFormat = WebMessageFormat.Json, ResponseFormat = WebMessageFormat.Json)]
         string GetComboDetail(PricingCond pricingCond);
+
+        [OperationContract]
+        [WebInvoke(Method = "POST", RequestFormat = WebMessageFormat.Json, ResponseFormat = WebMessageFormat.Json)]
+        string GetBasePriceInfoByCusProd(PricingCond pricingCond);
+
+        [OperationContract]
+        [WebInvoke(UriTemplate = "GetPromInfoByCusProd", Method = "POST", RequestFormat = WebMessageFormat.Json, ResponseFormat = WebMessageFormat.Json)]
+        string GetPromInfoByCusProd(PricingCond pricingCond);
+
+        [OperationContract]
+        [WebInvoke(UriTemplate = "GetPromationDetailSingle", Method = "POST", RequestFormat = WebMessageFormat.Json, ResponseFormat = WebMessageFormat.Json)]
+        string GetPromationDetailSingle(PricingCond pricingCond);
+
+        [OperationContract]
+        [WebInvoke(UriTemplate = "GetPromationDetailAssort", Method = "POST", RequestFormat = WebMessageFormat.Json, ResponseFormat = WebMessageFormat.Json)]
+        string GetPromationDetailAssort(PricingCond pricingCond);
 
     }
 

@@ -126,10 +126,12 @@
     <Compile Include="PricingCond.cs" />
     <Compile Include="Products.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Singleton.cs" />
     <Compile Include="WebRole.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="App_Data\" />
+    <Folder Include="MyApp\" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="packages.config" />

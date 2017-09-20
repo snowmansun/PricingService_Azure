@@ -45,6 +45,7 @@ namespace WCFServiceWebRole1
         /// <returns></returns>
         public string CalcPricing(PricingCond pricingCond)
         {
+            string debug = "";
             string jsonResult = string.Empty;
             try
             {
@@ -53,36 +54,37 @@ namespace WCFServiceWebRole1
                 List<Products> productList = pricingCond.products;
 
                 int keyid = Convert.ToInt32(ConfigurationManager.AppSettings["keyid"]);
+                debug = "1";
                 if (modelController == null)
                 {
-                    modelController = new ModelController(
-                       ConfigurationManager.AppSettings["provider"],
-                       ConfigurationManager.AppSettings["connstring"],
-                       "yyyy-MM-dd");
-                    modelController.CustomerExtraFields = "CCC_DISC_IND,CCC_ROUNDRLS,ALAND/TAXK1";
-                    modelController.ProductExtraFields = "MTART,SCL_RET";
+                    debug = "1-1";
+                    //modelController = new ModelController(
+                    //   ConfigurationManager.AppSettings["provider"],
+                    //   ConfigurationManager.AppSettings["connstring"],
+                    //   "yyyy-MM-dd");
+                    //modelController.CustomerExtraFields = "CCC_DISC_IND,CCC_ROUNDRLS,ALAND/TAXK1";
+                    //modelController.ProductExtraFields = "MTART,SCL_RET";
 
-                    model = null;
-
-                    if (model == null)
-                    {
-                        model = new Model();
-                        modelController.LoadConfiguration(model);
-                    }
-
+                    modelController = Singleton.CreateModelControllerInstance();
+                    debug = "2";
+                    //model = new Model();
+                    model = Singleton.CreateModelInstance();
+                    modelController.LoadConfiguration(model);
+                    debug = "3";
                     modelController.LoadCustomerCache(model, keyid,
                          DateTime.Today, Convert.ToDateTime("9999-01-01"));
-
+                    debug = "4";
                     // Get Customer (Cache contains single customer)
                     customerCache = model.CustomerCache[keyid];
+                    debug = "5";
                 }
-
+                debug = "1-2";
                 modelController.LoadCustomer(model, "*", "*", customerCode,
                        DateTime.Today, Convert.ToDateTime("9999-01-01"));
-
+                debug = "6";
                 modelController.LoadProductPricingIndex(model, keyid, customerCode,
                     DateTime.Today, Convert.ToDateTime("9999-01-01"));
-
+                debug = "7";
                 // Get Process
                 PricingProcess process = model.Configuration.PricingProcesses[2];
 
@@ -90,7 +92,7 @@ namespace WCFServiceWebRole1
                 PricingDoc pricingDoc = new PricingDoc();
                 pricingDoc.Customer = customerCache.CustomersByRef[customerCode];
                 pricingDoc.PricingDate = Convert.ToDateTime(date);
-                
+                debug = "8";
                 //
                 int i = 10;
                 foreach (Products pdu in productList)
@@ -103,12 +105,12 @@ namespace WCFServiceWebRole1
                     pricingDoc.PricingItems.Add(i, pricingItem);
                     i += 10;
                 }
-
+                debug = "9";
                 bool isAssort = modelController.GetAssortmentInfo(process, pricingDoc, model);
-
+                debug = "10";
                 // Execute Calculation
                 process.ExecutePricing(pricingDoc, isAssort);
-
+                debug = "11";
 
                 string jsonHead = "\"Summary\": {";
                 string jsonDetail = "\"Products\":[";
@@ -173,8 +175,10 @@ namespace WCFServiceWebRole1
                 jsonResult = "{" + jsonHead + jsonDetail + "}";
             }catch(Exception ex)
             {
-                return ex.Message;
+                modelController = null;
+                return ex.Message + " no" + debug;
             }
+            
 
             return jsonResult;
         }
@@ -222,6 +226,367 @@ namespace WCFServiceWebRole1
             return comboDetailJson;
         }
 
+        /// <summary>
+        /// GetBasePriceInfoByCusProd
+        /// </summary>
+        /// <param name="customerCode"></param>
+        /// <param name="products"></param>
+        /// <returns></returns>
+        public string GetBasePriceInfoByCusProd(PricingCond pricingCond)
+        {
+            string customerCode = pricingCond.customerCode;
+            List<Products> products = pricingCond.products;
+            // select all group data
+            DataSet dtPrice = new DataSet();
+            string sqlPrice = @"
+                                            SELECT * FROM 
+                                            (
+                                            SELECT  dense_rank()over (partition by productref ORDER BY ss.Sequence) num
+                                                    ,pr.StepTypeId
+                                                    ,RecordUom
+                                                    ,CustomerKeyId
+                                                    ,ProductKeyId
+            		                                ,p.productref
+                                                    ,Value
+                                            FROM PricingRecord pr 
+                                                    JOIN CustomerKey ck ON pr.CustomerKeyId=ck.KeyId
+            		                                JOIN CustomerKeyValue ckv ON pr.CustomerKeyId=ckv.KeyId
+                                                    JOIN ProductKey pk ON pr.ProductKeyId=pk.KeyId
+                                                    JOIN Customer c ON ck.CustomerId=c.CustomerId
+                                                    JOIN Product p ON pk.ProductId=p.ProductId
+                                                    JOIN StepType s on s.StepTypeId = pr.StepTypeId
+            		                                JOIN StepTypeSequence ss ON ss.StepTypeId =pr.StepTypeId AND ss.CustomerKeyTypeId = ckv.TypeId
+                                            WHERE c.CustomerRef= '{0}'
+                                              AND pr.RecordRef <> -1 and pr.ActiveFlag = 1
+            		                            --and productref in ('{1}')
+            		                            and s.StepTypeId = 93
+                                              and DateFrom <= GETDATE()
+            		                            and DateTo >= GETDATE()
+                                            ) a 
+                                            WHERE a.num=1";
+
+            //string sqlPrice = @"SELECT  
+            //                      pr.StepTypeId
+            //                      ,RecordUom
+            //                      ,CustomerKeyId
+            //                      ,ProductKeyId
+            //                      ,p.productref
+            //                      ,Value
+            //                    FROM PricingRecord pr 
+            //                            JOIN CustomerKey ck ON pr.CustomerKeyId=ck.KeyId
+            //                      JOIN CustomerKeyValue ckv ON pr.CustomerKeyId=ckv.KeyId
+            //                            JOIN ProductKey pk ON pr.ProductKeyId=pk.KeyId
+            //                            JOIN Customer c ON ck.CustomerId=c.CustomerId
+            //                            JOIN Product p ON pk.ProductId=p.ProductId
+            //                            JOIN StepType s on s.StepTypeId = pr.StepTypeId
+            //                      JOIN StepTypeSequence ss ON ss.StepTypeId =pr.StepTypeId AND ss.[CustomerKeyTypeId] = ckv.TypeId
+            //                      JOIN (
+            //                     SELECT  p.productref,min(ss.Sequence) MinSequence
+            //                    FROM PricingRecord pr 
+            //                            JOIN CustomerKey ck ON pr.CustomerKeyId=ck.KeyId
+            //                      JOIN CustomerKeyValue ckv ON pr.CustomerKeyId=ckv.KeyId
+            //                            JOIN ProductKey pk ON pr.ProductKeyId=pk.KeyId
+            //                            JOIN Customer c ON ck.CustomerId=c.CustomerId
+            //                            JOIN Product p ON pk.ProductId=p.ProductId
+            //                            JOIN StepType s on s.StepTypeId = pr.StepTypeId
+            //                      JOIN StepTypeSequence ss ON ss.StepTypeId =pr.StepTypeId AND ss.[CustomerKeyTypeId] = ckv.TypeId
+            //                    WHERE c.CustomerRef='{0}'
+            //                            AND pr.RecordRef <> -1 and pr.ActiveFlag = 1
+            //                      {1}
+            //                      and s.StepTypeId = 93
+            //                    group by productref
+            //                    ) tt on tt.productref=p.ProductRef and tt.MinSequence=ss.Sequence 
+            //                    WHERE c.CustomerRef='{0}'
+            //                            AND pr.RecordRef <> -1 and pr.ActiveFlag = 1
+            //                      {1}
+            //                      and s.StepTypeId = 93
+            //";
+
+            string strProduct = string.Empty;
+            foreach (Products p in products)
+            {
+                strProduct += ("'" + p.ProductId + "',");
+            }
+            if (strProduct != string.Empty) sqlPrice = string.Format(sqlPrice, customerCode, " and p.productref in ( " + strProduct.TrimEnd(',') + ")");
+            else sqlPrice = string.Format(sqlPrice, customerCode, " ");
+
+            if (modelController == null)
+            {
+                modelController = new ModelController(
+                   ConfigurationManager.AppSettings["provider"],
+                   ConfigurationManager.AppSettings["connstring"],
+                   "yyyy-MM-dd");
+            }
+            modelController.LoadData(dtPrice, "PricingRecord", sqlPrice);
+            string basePriceJson = string.Empty;
+            if (dtPrice.Tables[0].Rows.Count > 0)
+                basePriceJson = Dtb2Json(dtPrice.Tables[0]);
+
+            return basePriceJson;
+        }
+
+        /// <summary>
+        /// GetBasePriceInfoByCusProd
+        /// </summary>
+        /// <param name="customerCode"></param>
+        /// <param name="products"></param>
+        /// <returns></returns>
+        public string GetPromInfoByCusProd(PricingCond pricingCond)
+        {
+            DataSet dtProm = new DataSet();
+            string returnJson = string.Empty;
+            string sqlProm = @"SELECT distinct p.productref
+                              FROM PricingRecord pr 
+                              JOIN CustomerKey ck ON pr.CustomerKeyId=ck.KeyId
+                              JOIN ProductKey pk ON pr.ProductKeyId=pk.KeyId
+                              JOIN Customer c ON ck.CustomerId=c.CustomerId
+                              JOIN Product p ON pk.ProductId=p.ProductId
+                              JOIN StepType s on s.StepTypeId = pr.StepTypeId
+                              WHERE c.CustomerRef='{0}'
+                              AND pr.RecordRef<>-1
+                              AND s.UserExitName like '%Prom=S%'
+                              AND datefrom <= '{1}' 
+							  AND dateto >= '{1}' ";
+
+            modelController.LoadData(dtProm, "PricingRecord", string.Format(sqlProm, pricingCond.customerCode, pricingCond.deliverDay));
+
+            if (dtProm.Tables[0].Rows.Count > 0) returnJson = Dtb2Json(dtProm.Tables[0]);
+
+            return returnJson;
+        }
+
+        // update by chen 
+        /// <summary>
+        ///  Get Prom with prom by customercode
+        /// </summary>
+        /// <param name="process"></param>
+        /// <param name="pricingDoc"></param>
+        /// <returns></returns>
+        public string GetPromationDetailSingle(PricingCond pricingCond)
+        {
+            DataSet dtPromDetail = new DataSet();
+
+            string sqlProm = @"SELECT distinct 
+                                             pr.RecordRef, p.productref,s.UserExitName as UserExitName_S
+                                            ,pr.StepTypeId
+                                            ,RecordUom
+                                            ,CustomerKeyId
+                                            ,ProductKeyId
+                                            ,DateFrom
+                                            ,DateTo
+                                            ,MinQtyUom
+                                            ,MinQty
+                                            ,MaxQty
+                                            ,CalcType
+                                            ,Percentage
+                                            ,ValuePerQty
+                                            ,ValueUom
+                                            ,Value
+                                            ,MinValue
+                                            ,MaxValue
+                                            ,FgType
+                                            ,FgCalcType
+                                            ,FgCalcQty
+                                            ,FgFreeQty
+                                            ,FgMaxFreeQty
+                                            ,ConditionLogic
+                                            ,ActiveFlag
+                                            ,GroupRef
+                                            ,pr.UserExitName, '' as promDesc
+                                      FROM PricingRecord pr 
+                                      JOIN CustomerKey ck ON pr.CustomerKeyId=ck.KeyId
+                                      JOIN ProductKey pk ON pr.ProductKeyId=pk.KeyId
+                                      JOIN Customer c ON ck.CustomerId=c.CustomerId
+                                      JOIN Product p ON pk.ProductId=p.ProductId
+                                      JOIN StepType s on s.StepTypeId = pr.StepTypeId
+                                      WHERE c.CustomerRef='{0}'
+                                      AND pr.RecordRef <> -1 and pr.ActiveFlag = 1
+                                      AND s.UserExitName like '%Prom=S%'
+                                      AND datefrom <= '{1}' 
+							          AND dateto >= '{1}' 
+                                      AND Groupref = ''
+                                      AND productref  = '{2}'";
+
+            if (modelController == null)
+            {
+                modelController = new ModelController(
+                   ConfigurationManager.AppSettings["provider"],
+                   ConfigurationManager.AppSettings["connstring"],
+                   "yyyy-MM-dd");
+            }
+            modelController.LoadData(dtPromDetail, "PricingRecord", string.Format(sqlProm, pricingCond.customerCode, pricingCond.deliverDay, pricingCond.productCode));
+
+            //foreach (DataColumn col in dtPromDetail.Tables[0].Columns)
+            //{
+            //    if (col.ColumnName == "DateFrom" || col.ColumnName == "DateTo")
+            //    {
+            //        //修改列类型
+            //        col.DataType = typeof(DateTime);
+            //    }
+            //}
+
+            foreach (DataRow dr in dtPromDetail.Tables[0].Rows)
+            {
+                string userExitName = dr["UserExitName_S"].ToString();
+                string promDesc = string.Empty;
+                if (userExitName.IndexOf(';') != -1)
+                    promDesc = userExitName.Split(';')[1];
+                else
+                    promDesc = userExitName;
+                if (dr["CalcType"].ToString() == "AMNT")
+                {
+                    promDesc = string.Format(promDesc, dr["ValuePerQty"].ToString() + " " + dr["RecordUom"].ToString(), dr["Value"].ToString());
+                }
+                else if (dr["CalcType"].ToString() == "PERC" || dr["CalcType"].ToString() == "PINC")
+                {
+                    promDesc = string.Format(promDesc, dr["ValuePerQty"].ToString() + " " + dr["RecordUom"].ToString(), dr["Percentage"].ToString());
+                }
+                else if (dr["CalcType"].ToString() == "FEEE")
+                {
+                    promDesc = string.Format(promDesc, dr["FgCalcQty"].ToString() + " " + pricingCond.productCode, dr["FgCalcQty"].ToString() + " " + pricingCond.productCode);
+                }
+                dr["promDesc"] = promDesc.TrimStart("Desc=".ToCharArray());
+            }
+
+            return Dtb2Json(dtPromDetail.Tables[0]);
+        }
+
+        // update by chen 
+        /// <summary>
+        ///  Get Prom with prom by customercode
+        /// </summary>
+        /// <param name="process"></param>
+        /// <param name="pricingDoc"></param>
+        /// <returns></returns>
+        public string GetPromationDetailAssort(PricingCond pricingCond)
+        {
+            DataSet dtPromID = new DataSet();
+
+            string sqlProm = @"SELECT distinct recordref
+                              FROM PricingRecord pr 
+                              JOIN CustomerKey ck ON pr.CustomerKeyId=ck.KeyId
+                              JOIN ProductKey pk ON pr.ProductKeyId=pk.KeyId
+                              JOIN Customer c ON ck.CustomerId=c.CustomerId
+                              JOIN Product p ON pk.ProductId=p.ProductId
+                              JOIN StepType s on s.StepTypeId = pr.StepTypeId
+                              WHERE c.CustomerRef='{0}'
+                              AND productref = '{2}'
+                              AND pr.RecordRef <> -1 AND pr.ActiveFlag = 1
+                              AND s.UserExitName like '%Prom=S%'
+                              AND Datefrom <= '{1}' 
+							  AND Dateto >= '{1}' 
+                              AND Groupref <> ''
+                              AND CalcType = 'ATOT'";
+
+            if (modelController == null)
+            {
+                modelController = new ModelController(
+                   ConfigurationManager.AppSettings["provider"],
+                   ConfigurationManager.AppSettings["connstring"],
+                   "yyyy-MM-dd");
+            }
+            modelController.LoadData(dtPromID, "PricingRecord", string.Format(sqlProm, pricingCond.customerCode, pricingCond.deliverDay, pricingCond.productCode));
+
+            DataSet dtReturn = new DataSet();
+            foreach (DataRow dr in dtPromID.Tables[0].Rows)
+            {
+                DataTable dtAssortmentDesc = new DataTable();
+                dtAssortmentDesc.Columns.Add("RecordRef");
+                dtAssortmentDesc.Columns.Add("AssortType");
+                dtAssortmentDesc.Columns.Add("AssortProducts");
+                dtAssortmentDesc.Columns.Add("AssortDesc");
+                dtAssortmentDesc.Columns.Add("Qty");
+                dtAssortmentDesc.Columns.Add("Uom");
+                dtAssortmentDesc.Columns.Add("PromDesc");
+                dtAssortmentDesc.Columns.Add("DateFrom");
+                dtAssortmentDesc.Columns.Add("DateTo");
+                DataSet dtAssort = new DataSet();
+                string sqlAssort = string.Format(@"SELECT distinct p.ProductRef, pr.*
+                                                    FROM PricingRecord pr 
+                                                    JOIN CustomerKey ck ON pr.CustomerKeyId=ck.KeyId
+                                                    JOIN ProductKey pk ON pr.ProductKeyId=pk.KeyId
+                                                    JOIN Customer c ON ck.CustomerId=c.CustomerId
+                                                    JOIN Product p ON pk.ProductId=p.ProductId
+                                                    JOIN StepType s on s.StepTypeId = pr.StepTypeId
+                                                    WHERE recordref = '{0}'
+                                                    ORDER BY RecordId", dr["recordref"].ToString());
+
+                modelController.LoadData(dtAssort, "PricingRecord", sqlAssort);
+                string oldRecordid = string.Empty;
+                string productRef = string.Empty;
+                int index = 1;
+                foreach (DataRow drAssort in dtAssort.Tables[0].Rows)
+                {
+                    string recordId = drAssort["RecordId"].ToString();
+                    productRef = drAssort["ProductRef"].ToString();
+                    string scaleData = "";
+                    string qty = "";
+                    string promDesc = "";
+                    string[] userExitNameM = (drAssort["UserExitName"] + "").Split(';');
+                    foreach (string keyvalue in userExitNameM)
+                    {
+                        string[] type = keyvalue.Split('=');
+                        if (type[0] == "AS_RATIO")
+                        {
+                            qty = type[1];
+                            continue;
+                        }
+                        if (type[0] == "AS_DESC")
+                        {
+                            promDesc = type[1];
+                            continue;
+                        }
+                        if (type[0] == "SC_DATA")
+                        {
+                            scaleData = type[1];
+                            continue;
+                        }
+                    }
+
+                    if (recordId != oldRecordid)
+                    {
+                        DataRow drNew = dtAssortmentDesc.NewRow();
+                        drNew["RecordRef"] = drAssort["RecordRef"].ToString();
+                        //
+                        if (drAssort["CalcType"].ToString() == "ATOT")
+                        {
+                            drNew["AssortType"] = "REQU";
+                        }
+                        else
+                        {
+                            drNew["AssortType"] = "REWA";
+                        }
+                        drNew["AssortProducts"] = productRef.TrimEnd(',');
+                        // 
+                        if (scaleData != string.Empty)
+                            drNew["AssortDesc"] = scaleData + " " + drNew["AssortProducts"];
+                        else
+                            drNew["AssortDesc"] = qty + drAssort["RecordUom"] + " " + productRef.TrimEnd(',');
+                        drNew["Qty"] = qty;
+                        drNew["Uom"] = drAssort["RecordUom"] + "";
+                        drNew["PromDesc"] = promDesc;
+                        drNew["DateFrom"] = drAssort["DateFrom"] + "";
+                        drNew["DateTo"] = drAssort["DateTo"] + "";
+
+                        dtAssortmentDesc.Rows.Add(drNew);
+                        productRef = string.Empty;
+                    }
+                    else
+                    {
+                        dtAssortmentDesc.Rows[dtAssortmentDesc.Rows.Count - 1]["AssortProducts"] = dtAssortmentDesc.Rows[dtAssortmentDesc.Rows.Count - 1]["AssortProducts"] + "," + productRef;
+                        //if (scaleData == string.Empty)
+                        dtAssortmentDesc.Rows[dtAssortmentDesc.Rows.Count - 1]["AssortDesc"] = dtAssortmentDesc.Rows[dtAssortmentDesc.Rows.Count - 1]["AssortDesc"] + "," + productRef;
+                    }
+
+                    oldRecordid = recordId;
+                    index++;
+                }
+                dtReturn.Tables.Add(dtAssortmentDesc);
+            }
+
+            return Ds2Json(dtReturn);
+        }
+
         #endregion
 
         #region 自定义方法
@@ -236,12 +601,51 @@ namespace WCFServiceWebRole1
             JsonScr += "\"" + key + "\":\"" + value + "\",";
         }
 
+        /// <summary>    
+        /// DataSet转换为Json   
+        /// </summary>    
+        /// <param name="dataSet">DataSet对象</param>   
+        /// <returns>Json字符串</returns>    
+        public static string Ds2Json(DataSet dataSet)
+        {
+            string jsonString = "{";
+            foreach (DataTable table in dataSet.Tables)
+            {
+                jsonString += "\"" + table.TableName + "\":" + Dtb2Json(table) + ",";
+            }
+            jsonString = jsonString.TrimEnd(',');
+            return jsonString + "}";
+        }
+
+        ///// <summary>
+        ///// 将datatable转换为json  
+        ///// </summary>
+        ///// <param name="dtb">Dt</param>
+        ///// <returns>JSON字符串</returns>
+        //public static string Dtb2Json(DataTable dtb)
+        //{
+        //    JavaScriptSerializer jss = new JavaScriptSerializer();
+        //    System.Collections.ArrayList dic = new System.Collections.ArrayList();
+        //    foreach (DataRow dr in dtb.Rows)
+        //    {
+        //        System.Collections.Generic.Dictionary<string, object> drow = new System.Collections.Generic.Dictionary<string, object>();
+        //        foreach (DataColumn dc in dtb.Columns)
+        //        {
+        //            drow.Add(dc.ColumnName, dr[dc.ColumnName]);
+        //        }
+        //        dic.Add(drow);
+
+        //    }
+        //    //序列化  
+        //    return jss.Serialize(dic);
+        //}
+
         /// <summary>
         /// 将datatable转换为json  
         /// </summary>
         /// <param name="dtb">Dt</param>
         /// <returns>JSON字符串</returns>
-        public static string Dtb2Json(DataTable dtb)
+        private static string Dtb2Json(DataTable dtb)
         {
             JavaScriptSerializer jss = new JavaScriptSerializer();
             System.Collections.ArrayList dic = new System.Collections.ArrayList();
@@ -256,8 +660,43 @@ namespace WCFServiceWebRole1
 
             }
             //序列化  
-            return jss.Serialize(dic);
+            string jsonStr = jss.Serialize(dic);
+            jsonStr = System.Text.RegularExpressions.Regex.Replace(jsonStr, @"\\/Date\((\d+)\)\\/", match =>
+            {
+                DateTime dt = new DateTime(1970, 1, 1);
+                dt = dt.AddMilliseconds(long.Parse(match.Groups[1].Value));
+                dt = dt.ToLocalTime();
+                return dt.ToString("yyyy-MM-dd HH:mm:ss");
+            });
+            return jsonStr;
         }
+
+        //public static string Dtb2Json(DataTable dt)
+        //{
+        //    StringBuilder jsonBuilder = new StringBuilder();
+        //    jsonBuilder.Append("{\"");
+        //    jsonBuilder.Append(dt.TableName);
+        //    jsonBuilder.Append("\":[");
+        //    jsonBuilder.Append("[");
+        //    for (int i = 0; i < dt.Rows.Count; i++)
+        //    {
+        //        jsonBuilder.Append("{");
+        //        for (int j = 0; j < dt.Columns.Count; j++)
+        //        {
+        //            jsonBuilder.Append("\"");
+        //            jsonBuilder.Append(dt.Columns[j].ColumnName);
+        //            jsonBuilder.Append("\":\"");
+        //            jsonBuilder.Append(dt.Rows[i][j].ToString());
+        //            jsonBuilder.Append("\",");
+        //        }
+        //        jsonBuilder.Remove(jsonBuilder.Length - 1, 1);
+        //        jsonBuilder.Append("},");
+        //    }
+        //    jsonBuilder.Remove(jsonBuilder.Length - 1, 1);
+        //    jsonBuilder.Append("]");
+        //    jsonBuilder.Append("}");
+        //    return jsonBuilder.ToString();
+        //}
 
         public string GetData()
         {
